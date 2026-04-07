@@ -117,6 +117,126 @@ async function testHealth(): Promise<TestResult> {
   }
 }
 
+async function testAuthFlow(): Promise<{ results: TestResult[], token?: string, restaurantShortId?: string }> {
+  const results: TestResult[] = [];
+  const testId = Date.now().toString().slice(-6);
+  const email = `test-${testId}@orderzap.com`;
+  const password = "password123";
+  const shortId = `auth-${testId}`;
+  let token = "";
+
+  // 1. REGISTER
+  {
+    const start = Date.now();
+    try {
+      const res = await http.post("/auth/register", {
+        short_id: shortId,
+        name: `Auth Test Restaurant ${testId}`,
+        email,
+        password,
+        phone: "+91 0000000000"
+      });
+      if (res.status !== 201) throw new Error(`Status ${res.status}: ${res.data.error}`);
+      if (!res.data.data.token) throw new Error("No token returned on register");
+      results.push({
+        name: "Auth: POST /register",
+        passed: true,
+        durationMs: Date.now() - start,
+      });
+    } catch (e: any) {
+      results.push({
+        name: "Auth: POST /register",
+        passed: false,
+        error: e.response?.data?.error || e.message,
+        durationMs: Date.now() - start,
+      });
+      return { results };
+    }
+  }
+
+  // 2. LOGIN
+  {
+    const start = Date.now();
+    try {
+      const res = await http.post("/auth/login", { email, password });
+      if (res.status !== 200) throw new Error(`Status ${res.status}: ${res.data.error}`);
+      token = res.data.data.token;
+      if (!token) throw new Error("No token returned on login");
+      results.push({
+        name: "Auth: POST /login",
+        passed: true,
+        durationMs: Date.now() - start,
+      });
+    } catch (e: any) {
+      results.push({
+        name: "Auth: POST /login",
+        passed: false,
+        error: e.response?.data?.error || e.message,
+        durationMs: Date.now() - start,
+      });
+      return { results };
+    }
+  }
+
+  // 3. INVALID LOGIN
+  {
+    const start = Date.now();
+    try {
+      const res = await http.post("/auth/login", { email, password: "wrong-password" });
+      if (res.status === 401) {
+        results.push({
+          name: "Auth: POST /login (invalid password rejection)",
+          passed: true,
+          durationMs: Date.now() - start,
+        });
+      } else {
+        throw new Error(`Expected 401, got ${res.status}`);
+      }
+    } catch (e: any) {
+      if (e.response?.status === 401) {
+        results.push({
+          name: "Auth: POST /login (invalid password rejection)",
+          passed: true,
+          durationMs: Date.now() - start,
+        });
+      } else {
+        results.push({
+          name: "Auth: POST /login (invalid password rejection)",
+          passed: false,
+          error: e.message,
+          durationMs: Date.now() - start,
+        });
+      }
+    }
+  }
+
+  // 4. GET /auth/me (Check Session)
+  {
+    const start = Date.now();
+    try {
+      const res = await http.get("/auth/me", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.status !== 200) throw new Error(`Status ${res.status}: ${res.data.error}`);
+      if (res.data.data.staff.email !== email) throw new Error("Staff email mismatch");
+      results.push({
+        name: "Auth: GET /me (session validation)",
+        passed: true,
+        durationMs: Date.now() - start,
+      });
+    } catch (e: any) {
+      results.push({
+        name: "Auth: GET /me (session validation)",
+        passed: false,
+        error: e.response?.data?.error || e.message,
+        durationMs: Date.now() - start,
+      });
+    }
+  }
+
+  return { results, token, restaurantShortId: shortId };
+}
+
 async function testApiRoot(): Promise<TestResult> {
   const start = Date.now();
   try {
@@ -1404,12 +1524,27 @@ async function runAllTests(): Promise<TestResult[]> {
   const all: TestResult[] = [];
   const testId = Date.now().toString().slice(-5);
 
+  // 0. Auth Flow
+  console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  console.log("  PHASE 0: Authentication Flow");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  const auth = await testAuthFlow();
+  all.push(...auth.results);
+
+  if (!auth.token || !auth.restaurantShortId) {
+    console.warn("⚠️  Auth tests failed, skipping rest of the suite.");
+    return all;
+  }
+
   // 1. Health & Root
   console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("  PHASE 1: Health & Root");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   all.push(await testHealth());
   all.push(await testApiRoot());
+
+  // Use the token/id from auth for the rest of Phase 1-9 if needed
+  let restaurantShortId = auth.restaurantShortId;
 
   // 2. Restaurant
   console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -1419,13 +1554,13 @@ async function runAllTests(): Promise<TestResult[]> {
   all.push(...restroResults);
 
   // Create a persistent restaurant for remaining tests
-  let restaurantShortId = "";
   let restaurantPgId = "";
   {
     const res = await http.post("/restaurant/", {
       short_id: `rt-${testId}`,
       name: `Persistent Test ${testId}`,
     });
+    // @ts-ignore
     restaurantShortId = res.data.data.short_id;
     restaurantPgId = res.data.data.id;
   }

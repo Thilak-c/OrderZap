@@ -16,6 +16,77 @@ Header: x-api-key = "ozk_a7f3d9e1b2c4056f8e9d1a3b5c7f0e2d4a6b8c0d2e4f6a8b0c2d4e6
 
 **Pagination (all GET lists):**  `?page=1&limit=20`
 
+
+## Authentication (/api/auth)
+
+**Keys:** `x-api-key` required for all.
+
+---
+
+### POST /api/auth/register — Create restaurant + owner
+Registers a new restaurant and its first "Owner" staff member in a single transaction.
+
+| Field | Type | Required | Default |
+|-------|------|----------|---------|
+| `short_id` | string | ✅ | — |
+| `name` | string | ✅ | — |
+| `email` | string | ✅ | — |
+| `password` | string | ✅ | — |
+| `phone` | string | ❌ | — |
+| `logo` | string | ❌ | — |
+| `status` | string | ❌ | `"trial"` |
+
+**Returns:** `201`
+```json
+{
+  "success": true,
+  "data": {
+    "token": "eyJhbGci...",
+    "restaurant": { "short_id": "bts", "name": "Burger Town", "logo": "..." }
+  }
+}
+```
+
+---
+
+### POST /api/auth/login — Staff login
+Authenticates a staff member and returns a JWT session token.
+
+| Field | Type | Required |
+|-------|------|----------|
+| `email` | string | ✅ |
+| `password` | string | ✅ |
+
+**Returns:** `200`
+```json
+{
+  "success": true,
+  "data": {
+    "token": "eyJhbGci...",
+    "restaurant": { "short_id": "bts", "name": "Burger Town" },
+    "staff": { "id": "uuid", "name": "Owner", "role": "owner" }
+  }
+}
+```
+
+---
+
+### GET /api/auth/me — Get current session
+Returns the profile of the currently logged-in staff member.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Returns:** `200`
+```json
+{
+  "success": true,
+  "data": {
+    "staff": { "id": "uuid", "name": "Owner", "email": "owner@..." },
+    "restaurant": { "short_id": "bts", "name": "Burger Town" }
+  }
+}
+```
+
 ---
 
 ## /api/health

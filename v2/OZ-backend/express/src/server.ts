@@ -97,12 +97,16 @@ app.use("/api", mainRouter);
 
 // Root route — HTML API explorer
 app.get("/", (_req, res) => {
-  const docsPath = path.join(process.cwd(), "express", "API_DOCS.md");
+  let docsPath = path.join(process.cwd(), "express", "API_DOCS.md");
+  if (!fs.existsSync(docsPath)) {
+    docsPath = path.join(process.cwd(), "API_DOCS.md");
+  }
+
   let mdContent = "API Documentation not found.";
   try {
     mdContent = fs.readFileSync(docsPath, "utf-8");
   } catch(e) {
-    console.error("Could not read API_DOCS.md", e);
+    console.error(`Could not read API_DOCS.md at ${docsPath}`, e);
   }
   
   res.setHeader("Content-Type", "text/html");

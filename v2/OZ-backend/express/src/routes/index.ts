@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import authRouter from './auth';
 import menuRouter from './menu/index';
 import healthRouter from './health';
 import restaurantRouter from './restaurant/index';
@@ -10,6 +11,9 @@ import restaurantRouter from './restaurant/index';
  * All menu features are scoped to a :restaurantId via SaaS-style paths.
  */
 const mainRouter = Router();
+
+// Authentication Logic
+mainRouter.use('/auth', authRouter);
 
 // Standard health check (not restaurant-scoped)
 mainRouter.use('/health', healthRouter);

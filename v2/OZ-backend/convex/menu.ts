@@ -55,6 +55,14 @@ export const upsertRestaurantMirror = mutation({
   handler: async (ctx, args) => await updateOrInsert(ctx, "restaurants", args.pgId, args),
 });
 
+export const upsertStaffMirror = mutation({
+  args: { 
+    pgId: v.string(), restaurantId: v.string(), name: v.string(), 
+    role: v.string(), isActive: v.boolean(), updatedAt: v.optional(v.number()) 
+  },
+  handler: async (ctx, args) => await updateOrInsert(ctx, "staff", args.pgId, args),
+});
+
 export const upsertMenuMirror = mutation({
   args: { pgId: v.string(), restaurantId: v.string(), name: v.string(), isActive: v.boolean() },
   handler: async (ctx, args) => await updateOrInsert(ctx, "menus", args.pgId, args),

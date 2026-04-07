@@ -1,0 +1,50 @@
+# OrderZap V2 Backend - Step-by-Step Guide for Adding New Routing & Tables
+
+When adding a new set of routing table features to support new frontend functionality, strictly follow these steps to ensure PostgreSQL integrity, API correctness, and Convex real-time synchronization.
+
+### Step 1: Database Schema (PostgreSQL)
+- **File:** `postgres/schema.sql` (and an equivalent migration/update file if needed)
+- **Action:** Add the raw SQL `CREATE TABLE` definition. 
+- *Crucial Fields:* Always include `id` (usually `varchar` for short IDs), `restaurant_id`, `created_at`, and `updated_at`. Make sure foreign keys correctly reference parents (like `category_id` references `menu_categories`).
+
+### Step 2: TypeScript Types
+- **File:** `express/src/types/database.ts` (or similar)
+- **Action:** Add a TypeScript interface mapping exactly to the new PostgreSQL table columns.
+
+### Step 3: Convex Sync Architecture (Real-time Mirror)
+- **File 1:** `convex/schema.ts`
+  - **Action:** Add the mirrored table definition inside the `defineSchema({ ... })` block.
+  - **Example Structure:**
+    ```typescript
+    new_feature_table: defineTable({
+      pgId: v.string(), // Maps to PostgreSQL id
+      restaurantId: v.string(), // Maps to PostgreSQL restaurant_id
+      name: v.string(), // Custom field example
+      isActive: v.boolean(),
+      updatedAt: v.number(),
+    }).index("by_pg_id", ["pgId"]).index("by_restaurant", ["restaurantId"]),
+    ```
+- **File 2:** `convex/menu.ts` (or a relevant action file)
+  - **Action:** Add an `upsert[Feature]Mirror` mutation so the Express API can push changes to Convex. Add `query` functions so the frontend can read the synced data.
+
+### Step 4: Express Controller Logic
+- **File:** `express/src/routes/menu/[new-feature].ts`
+- **Action:** Create the RESTful endpoints (`GET`, `POST`, `PUT`, `DELETE`).
+- **Database Rules:** Use the `query()` wrapper from `../../config/database.ts` to execute PostgreSQL commands directly.
+- **Convex Sync Rules:** 
+  - After a `POST` or `PUT`, call `await mutationConvex('...upsert[Feature]Mirror', {...})`.
+  - After a `DELETE`, call `await mutationConvex('...deleteMirrorRecord', { table: 'new_table_name', pgId: id })`.
+
+### Step 5: Route Registration
+- **File:** `express/src/routes/menu/index.ts` (or appropriate parent router)
+- **Action:** Import the new router and mount it: `router.use('/:restaurantId/menu/[new-feature]', newFeatureRouter)`.
+
+### Step 6: Testing & Validation
+- **File:** `express/src/tests/fullRouteTest.ts`
+- **Action:** 
+  1. Add a `test[Feature]CRUD(restaurantId)` function.
+  2. Implement an automated workflow creating a record via the `POST` route.
+  3. Follow it with a `sleep(2000)` and verify using `queryConvex()` that the record was mirrored.
+  4. Test `PUT` and `DELETE` similarly to ensure the sync works both ways.
+  5. Add your new function to the main execution flow at the bottom of the file.
+- **Run:** `npx tsx src/tests/fullRouteTest.ts` to ensure 100% pass rate.

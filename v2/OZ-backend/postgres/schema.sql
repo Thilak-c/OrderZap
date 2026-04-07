@@ -20,6 +20,9 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Table 1: restaurants
 -- Purpose: Core restaurant entity with business information, branding, and subscription status
 -- Convex Source: restaurants table
+-- Table 1: restaurants
+-- Purpose: Core restaurant entity with business information, branding, and subscription status
+-- Convex Source: restaurants table
 CREATE TABLE restaurants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     short_id TEXT NOT NULL UNIQUE, -- Convex: id (short restaurant ID like "bts", "mgc")
@@ -38,6 +41,7 @@ CREATE TABLE restaurants (
     is_open BOOLEAN, -- Convex: isOpen (current open/closed status)
     business_hours JSONB, -- Convex: businessHours (weekly schedule)
     created_at BIGINT NOT NULL, -- Convex: createdAt (timestamp)
+    updated_at BIGINT, -- Convex: updatedAt
     owner_name TEXT, -- Convex: ownerName
     owner_phone TEXT, -- Convex: ownerPhone
     manager_name TEXT, -- Convex: managerName
@@ -47,9 +51,8 @@ CREATE TABLE restaurants (
     google_maps_link TEXT, -- Convex: googleMapsLink
     onboarding_filled_by TEXT, -- Convex: onboardingFilledBy
     onboarding_filled_by_name TEXT, -- Convex: onboardingFilledByName
-    map_link TEXT, -- Convex: mapLink (deprecated)
+    map_link TEXT, -- Convex: mapLink (deprecated, use google_maps_link)
     onboarding_status INTEGER, -- Convex: onboardingStatus (0-100)
-    theme_colors JSONB, -- Convex: themeColors {dominant, muted, darkVibrant, lightVibrant}
     status TEXT CHECK (status IN ('trial', 'active', 'expired', 'blocked')), -- Convex: status
     trial_start_date BIGINT, -- Convex: trialStartDate
     trial_end_date BIGINT, -- Convex: trialEndDate
@@ -503,7 +506,14 @@ CREATE TABLE orders (
     customer_session_id TEXT, -- Convex: customerSessionId
     customer_phone TEXT, -- Convex: customerPhone
     customer_name TEXT, -- Convex: customerName
+    deposit_used NUMERIC(10, 2) DEFAULT 0, -- Convex: depositUsed
+    special_instructions TEXT, -- Convex: specialInstructions
+    -- Waiter assignment
     assigned_waiter_id UUID, -- Convex: assignedWaiterId
+    assigned_at BIGINT, -- Convex: assignedAt
+    assignment_status TEXT CHECK (assignment_status IN ('pending', 'accepted', 'rejected', 'timeout')), -- Convex: assignmentStatus
+    assignment_accepted_at BIGINT, -- Convex: assignmentAcceptedAt
+    assignment_timeout_at BIGINT, -- Convex: assignmentTimeoutAt
     created_at BIGINT NOT NULL, -- Convex: createdAt
     updated_at BIGINT NOT NULL, -- Convex: updatedAt
     FOREIGN KEY (restaurant_id) REFERENCES restaurants(short_id) ON DELETE CASCADE,
